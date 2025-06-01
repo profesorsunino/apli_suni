@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Cursos Offline v2</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        nav { margin-bottom: 20px; background-color: #5cb85c; padding: 10px; border-radius: 5px; display: flex; flex-wrap: wrap; gap: 10px;}
+        nav button { background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        nav button:hover { background-color: #45a049; }
+        nav button.export { background-color: #f0ad4e; }
+        nav button.export:hover { background-color: #ec971f; }
+        nav button.import { background-color: #5bc0de; }
+        nav button.import:hover { background-color: #31b0d5; }
+        .section { display: none; margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;}
+        .section.active { display: block; }
+        input[type="text"], input[type="number"], input[type="date"], select, textarea {
+            width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+        }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px; }
+        button:hover { background-color: #0056b3; }
+        button.delete { background-color: #dc3545; }
+        button.delete:hover { background-color: #c82333; }
+        button.edit { background-color: #ffc107; color: #333; }
+        button.edit:hover { background-color: #e0a800; }
+        ul { list-style-type: none; padding: 0; }
+        li { background-color: #fff; border: 1px solid #eee; padding: 10px; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #e9e9e9; }
+        .attendance-status label { margin-right: 10px;}
+        .hidden { display: none !important; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Gestor de Cursos Offline v2</h1>
+
+        <nav>
+            <button onclick="showSection('cursos')">Cursos</button>
+            <button onclick="showSection('alumnos')" id="navAlumnos" class="hidden">Alumnos</button>
+            <button onclick="showSection('trabajos')" id="navTrabajos" class="hidden">Trabajos</button>
+            <button onclick="showSection('asistencia')" id="navAsistencia" class="hidden">Asistencia</button>
+            <button onclick="showSection('calificaciones')" id="navCalificaciones" class="hidden">Calificaciones</button>
+            <button onclick="showSection('temas')" id="navTemas" class="hidden">Temas y Enlaces</button>
+            <button onclick="showSection('informes')" id="navInformes" class="hidden">Informes</button>
+            <button onclick="exportarDatos()" class="export">Exportar Datos (JSON)</button>
+            <button onclick="document.getElementById('importFile').click()" class="import">Importar Datos (JSON)</button>
+            <input type="file" id="importFile" accept=".json" class="hidden" onchange="importarDatos(event)">
+        </nav>
+
+        <div class="form-group hidden" id="cursoSelectorContainer">
+            <label for="cursoActivoSelector">Curso Activo:</label>
+            <select id="cursoActivoSelector" onchange="seleccionarCursoActivo()"></select>
+        </div>
+
+        <!-- Sección Cursos -->
+        <div id="cursos" class="section">
+            <h2>Administrar Cursos</h2>
+            <div class="form-group">
+                <label for="nombreCurso">Nombre del Curso:</label>
+                <input type="text" id="nombreCurso" placeholder="Ej: Matemáticas I">
+                <button onclick="agregarCurso()">Agregar Curso</button>
+            </div>
+            <h3>Cursos Existentes:</h3>
+            <ul id="listaCursos"></ul>
+        </div>
+
+        <!-- Sección Alumnos (requiere un curso seleccionado) -->
+        <div id="alumnos" class="section">
+            <h2>Administrar Alumnos (<span id="cursoSeleccionadoAlumnos"></span>)</h2>
+            <div class="form-group">
+                <label for="nombreAlumno">Nombre:</label>
+                <input type="text" id="nombreAlumno" placeholder="Nombre del Alumno">
+            </div>
+            <div class="form-group">
+                <label for="apellidoAlumno">Apellido:</label>
+                <input type="text" id="apellidoAlumno" placeholder="Apellido del Alumno">
+            </div>
+            <button onclick="agregarAlumno()">Agregar Alumno</button>
+            <h3>Alumnos del Curso:</h3>
+            <ul id="listaAlumnos"></ul>
+        </div>
+
+        <!-- Sección Trabajos (requiere un curso seleccionado) -->
+        <div id="trabajos" class="section">
+            <h2>Administrar Trabajos (<span id="cursoSeleccionadoTrabajos"></span>)</h2>
+            <div class="form-group">
+                <label for="nombreTrabajo">Nombre del Trabajo:</label>
+                <input type="text" id="nombreTrabajo" placeholder="Ej: TP N°1 - Funciones">
+            </div>
+             <div class="form-group">
+                <label for="descripcionTrabajo">Descripción (opcional):</label>
+                <textarea id="descripcionTrabajo" placeholder="Detalles del trabajo"></textarea>
+            </div>
+            <button onclick="agregarTrabajo()">Agregar Trabajo</button>
+            <h3>Trabajos del Curso:</h3>
+            <ul id="listaTrabajos"></ul>
+        </div>
+
+        <!-- Sección Asistencia (requiere un curso seleccionado) -->
+        <div id="asistencia" class="section">
+            <h2>Tomar Asistencia (<span id="cursoSeleccionadoAsistencia"></span>)</h2>
+            <div class="form-group">
+                <label for="fechaAsistencia">Fecha:</label>
+                <input type="date" id="fechaAsistencia" value="">
+                <button onclick="cargarFormularioAsistencia()">Cargar Alumnos para Asistencia</button>
+            </div>
+            <div id="formularioAsistenciaContainer">
+                <!-- Aquí se generará la lista de alumnos para tomar asistencia -->
+            </div>
+            <button onclick="guardarAsistencia()" id="btnGuardarAsistencia" class="hidden">Guardar Asistencia</button>
+        </div>
+
+        <!-- Sección Calificaciones (requiere un curso seleccionado) -->
+        <div id="calificaciones" class="section">
+            <h2>Registrar Calificaciones (<span id="cursoSeleccionadoCalificaciones"></span>)</h2>
+            <div class="form-group">
+                <label for="alumnoCalificacionSelector">Alumno:</label>
+                <select id="alumnoCalificacionSelector"></select>
+            </div>
+            <div class="form-group">
+                <label for="trabajoCalificacionSelector">Trabajo:</label>
+                <select id="trabajoCalificacionSelector"></select>
+            </div>
+            <div class="form-group">
+                <label for="notaTrabajo">Nota (1-10):</label>
+                <input type="number" id="notaTrabajo" min="1" max="10">
+            </div>
+            <div class="form-group">
+                <label for="comentarioTrabajo">Comentario:</label>
+                <textarea id="comentarioTrabajo"></textarea>
+            </div>
+            <button onclick="guardarCalificacion()">Guardar Calificación</button>
+            <h3>Calificaciones Registradas:</h3>
+            <div class="form-group">
+                <label for="filtroVistaCalificaciones">Ver por:</label>
+                <select id="filtroVistaCalificaciones" onchange="renderCalificaciones()">
+                    <option value="alumno">Alumno</option>
+                    <option value="trabajo">Trabajo</option>
+                </select>
+                <select id="selectorFiltroCalificaciones" onchange="renderCalificaciones()" class="hidden"></select>
+            </div>
+            <div id="listaCalificacionesContainer"></div>
+        </div>
+        
+        <!-- Sección Temas y Enlaces (requiere un curso seleccionado) -->
+        <div id="temas" class="section">
+            <h2>Temas y Enlaces (<span id="cursoSeleccionadoTemas"></span>)</h2>
+            <div class="form-group">
+                <label for="tituloTema">Título del Tema/Recurso:</label>
+                <input type="text" id="tituloTema" placeholder="Ej: Introducción a Álgebra">
+            </div>
+            <div class="form-group">
+                <label for="enlaceTema">Enlace (URL):</label>
+                <input type="text" id="enlaceTema" placeholder="https://ejemplo.com/material.pdf">
+            </div>
+            <button onclick="agregarTema()">Agregar Tema/Enlace</button>
+            <h3>Temas y Enlaces del Curso:</h3>
+            <ul id="listaTemas"></ul>
+        </div>
+
+        <!-- Sección Informes (requiere un curso seleccionado) -->
+        <div id="informes" class="section">
+            <h2>Generar Informes (<span id="cursoSeleccionadoInformes"></span>)</h2>
+            <button onclick="generarInformeAsistencia()">Informe de Asistencia (CSV)</button>
+            <br><br>
+            <button onclick="generarInformeCalificaciones()">Informe de Calificaciones (CSV)</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- ESTRUCTURA DE DATOS ---
+        let data = {
+            cursos: [], // { id, nombre }
+            alumnos: [], // { id, idCurso, nombre, apellido }
+            trabajos: [], // { id, idCurso, nombre, descripcion }
+            asistencias: [], // { id, idCurso, idAlumno, fecha, estado ('presente', 'ausente', 'tarde') }
+            calificaciones: [], // { id, idCurso, idAlumno, idTrabajo, nota, comentario }
+            temas: [] // { id, idCurso, titulo, enlace }
+        };
+
+        let cursoActivoId = null;
+        const DB_NAME = 'gestorCursosData';
+
+        // --- FUNCIONES AUXILIARES ---
+        function generarId() {
+            return '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function guardarDatos() {
+            localStorage.setItem(DB_NAME, JSON.stringify(data));
+        }
+
+        function cargarDatos() {
+            const datosGuardados = localStorage.getItem(DB_NAME);
+            if (datosGuardados) {
+                try {
+                    const parsedData = JSON.parse(datosGuardados);
+                    // Basic validation
+                    if (parsedData && typeof parsedData === 'object' && 
+                        Array.isArray(parsedData.cursos) &&
+                        Array.isArray(parsedData.alumnos) &&
+                        Array.isArray(parsedData.trabajos) &&
+                        Array.isArray(parsedData.asistencias) &&
+                        Array.isArray(parsedData.calificaciones) &&
+                        Array.isArray(parsedData.temas)) {
+                        data = parsedData;
+                    } else {
+                        console.warn("Datos guardados en localStorage con formato incorrecto. Se usarán datos por defecto.");
+                        data = { cursos: [], alumnos: [], trabajos: [], asistencias: [], calificaciones: [], temas: [] }; // Reset to default
+                    }
+                } catch (error) {
+                    console.error("Error al parsear datos de localStorage:", error);
+                    data = { cursos: [], alumnos: [], trabajos: [], asistencias: [], calificaciones: [], temas: [] }; // Reset to default
+                }
+                
+                const cursoActivoGuardado = localStorage.getItem('gestorCursosActivoId');
+                if (cursoActivoGuardado && data.cursos.find(c => c.id === cursoActivoGuardado)) {
+                    cursoActivoId = cursoActivoGuardado;
+                } else {
+                    cursoActivoId = null; // Ensure cursoActivoId is reset if not valid
+                }
+            } else {
+                 data = { cursos: [], alumnos: [], trabajos: [], asistencias: [], calificaciones: [], temas: [] }; // Ensure data object exists
+            }
+        }
+        
+        function getNombreCurso(idCurso) {
+            const curso = data.cursos.find(c => c.id === idCurso);
+            return curso ? curso.nombre : "Curso Desconocido";
+        }
+
+        function getNombreAlumnoCompleto(idAlumno) {
+            const alumno = data.alumnos.find(a => a.id === idAlumno);
+            return alumno ? `${alumno.nombre} ${alumno.apellido}` : "Alumno Desconocido";
+        }
+
+        function getNombreTrabajo(idTrabajo) {
+            const trabajo = data.trabajos.find(t => t.id === idTrabajo);
+            return trabajo ? trabajo.nombre : "Trabajo Desconocido";
+        }
+
+
+        // --- NAVEGACIÓN Y VISUALIZACIÓN DE SECCIONES ---
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+            const currentSection = document.getElementById(sectionId);
+            if (currentSection) {
+                currentSection.classList.add('active');
+            } else {
+                console.warn(`Sección con ID '${sectionId}' no encontrada.`);
+                document.getElementById('cursos').classList.add('active'); // Fallback a cursos
+            }
+            
+            if (cursoActivoId) {
+                actualizarNombresCursosSeleccionados();
+                // Si la sección que se muestra depende del curso, refrescar su contenido
+                switch(sectionId) {
+                    case 'alumnos': renderAlumnos(); break;
+                    case 'trabajos': renderTrabajos(); break;
+                    case 'asistencia': 
+                        document.getElementById('formularioAsistenciaContainer').innerHTML = ''; 
+                        document.getElementById('btnGuardarAsistencia').classList.add('hidden'); 
+                        break;
+                    case 'calificaciones': renderCalificacionesSelectores(); renderCalificaciones(); break;
+                    case 'temas': renderTemas(); break;
+                }
+            } else if (sectionId !== 'cursos') {
+                 // Si no hay curso activo y no estamos en la sección de cursos, redirigir a cursos
+                 showSection('cursos');
+            }
+        }
+        
+        function actualizarVisibilidadNavCurso() {
+            const hayCursos = data.cursos.length > 0;
+            const cursoActivoEstaSeleccionado = cursoActivoId !== null;
+
+            document.getElementById('cursoSelectorContainer').classList.toggle('hidden', !hayCursos);
+
+            ['navAlumnos', 'navTrabajos', 'navAsistencia', 'navCalificaciones', 'navTemas', 'navInformes'].forEach(id => {
+                const navButton = document.getElementById(id);
+                if (navButton) {
+                    navButton.classList.toggle('hidden', !cursoActivoEstaSeleccionado);
+                }
+            });
+
+            // Si no hay curso activo seleccionado y la sección activa no es 'cursos', ir a 'cursos'
+            const seccionActiva = document.querySelector('.section.active');
+            if (!cursoActivoEstaSeleccionado && seccionActiva && seccionActiva.id !== 'cursos') {
+                showSection('cursos');
+            }
+        }
+
+        function actualizarNombresCursosSeleccionados() {
+            if (!cursoActivoId) return;
+            const nombreCurso = getNombreCurso(cursoActivoId);
+            ['Alumnos', 'Trabajos', 'Asistencia', 'Calificaciones', 'Temas', 'Informes'].forEach(sufijo => {
+                 const span = document.getElementById(`cursoSeleccionado${sufijo}`);
+                 if (span) span.textContent = nombreCurso;
+            });
+        }
+
+
+        // --- GESTIÓN DE CURSOS ---
+        function agregarCurso() {
+            const nombreCursoInput = document.getElementById('nombreCurso');
+            const nombre = nombreCursoInput.value.trim();
+            if (nombre) {
+                data.cursos.push({ id: generarId(), nombre: nombre });
+                nombreCursoInput.value = '';
+                guardarDatos();
+                renderCursos();
+                renderSelectorCursos();
+                actualizarVisibilidadNavCurso();
+                if (data.cursos.length === 1 && !cursoActivoId) { // Si es el primer curso, seleccionarlo
+                    seleccionarCursoActivo(data.cursos[0].id);
+                }
+            } else {
+                alert('Por favor, ingrese un nombre para el curso.');
+            }
+        }
+
+        function renderCursos() {
+            const listaCursos = document.getElementById('listaCursos');
+            listaCursos.innerHTML = '';
+            data.cursos.forEach(curso => {
+                const li = document.createElement('li');
+                
+                const nombreCursoSpan = document.createElement('span');
+                nombreCursoSpan.textContent = curso.nombre;
+                li.appendChild(nombreCursoSpan);
+                
+                const divBotones = document.createElement('div');
+                const btnEditar = document.createElement('button');
+                btnEditar.textContent = 'Editar';
+                btnEditar.className = 'edit';
+                btnEditar.onclick = () => editarCurso(curso.id);
+
+                const btnBorrar = document.createElement('button');
+                btnBorrar.textContent = 'Borrar';
+                btnBorrar.className = 'delete';
+                btnBorrar.onclick = () => borrarCurso(curso.id);
+                
+                divBotones.appendChild(btnEditar);
+                divBotones.appendChild(btnBorrar);
+                li.appendChild(divBotones);
+                listaCursos.appendChild(li);
+            });
+        }
+        
+        function editarCurso(idCurso) {
+            const curso = data.cursos.find(c => c.id === idCurso);
+            if (!curso) return;
+            const nuevoNombre = prompt("Nuevo nombre para el curso:", curso.nombre);
+            if (nuevoNombre === null) return; // User cancelled
+
+            if (nuevoNombre.trim() !== "") {
+                curso.nombre = nuevoNombre.trim();
+                guardarDatos();
+                renderCursos();
+                renderSelectorCursos(); 
+                if (cursoActivoId === idCurso) {
+                    actualizarNombresCursosSeleccionados();
+                }
+            } else {
+                alert("El nombre del curso no puede estar vacío.");
+            }
+        }
+
+        function borrarCurso(idCurso) {
+            if (confirm('¿Está seguro de que desea borrar este curso? Se borrarán también todos sus alumnos, trabajos, asistencias, calificaciones y temas asociados.')) {
+                data.cursos = data.cursos.filter(c => c.id !== idCurso);
+                data.alumnos = data.alumnos.filter(a => a.idCurso !== idCurso);
+                data.trabajos = data.trabajos.filter(t => t.idCurso !== idCurso);
+                data.asistencias = data.asistencias.filter(as => as.idCurso !== idCurso);
+                data.calificaciones = data.calificaciones.filter(cal => cal.idCurso !== idCurso);
+                data.temas = data.temas.filter(t => t.idCurso !== idCurso);
+
+                if (cursoActivoId === idCurso) {
+                    cursoActivoId = null;
+                    localStorage.removeItem('gestorCursosActivoId');
+                    document.getElementById('cursoActivoSelector').value = "";
+                }
+                guardarDatos();
+                renderCursos();
+                renderSelectorCursos();
+                actualizarVisibilidadNavCurso(); 
+                
+                if (!cursoActivoId) {
+                    ['listaAlumnos', 'listaTrabajos', 'formularioAsistenciaContainer', 'listaCalificacionesContainer', 'listaTemas'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.innerHTML = '';
+                    });
+                    ['Alumnos', 'Trabajos', 'Asistencia', 'Calificaciones', 'Temas', 'Informes'].forEach(sufijo => {
+                        const span = document.getElementById(`cursoSeleccionado${sufijo}`);
+                        if (span) span.textContent = "";
+                   });
+                   showSection('cursos'); // Ir a la sección cursos si el activo fue borrado
+                }
+            }
+        }
+        
+        function renderSelectorCursos() {
+            const selector = document.getElementById('cursoActivoSelector');
+            const valorActual = selector.value;
+            selector.innerHTML = '<option value="">-- Seleccione un curso --</option>';
+            data.cursos.forEach(curso => {
+                const option = document.createElement('option');
+                option.value = curso.id;
+                option.textContent = curso.nombre;
+                selector.appendChild(option);
+            });
+
+            if (cursoActivoId && data.cursos.find(c => c.id === cursoActivoId)) {
+                selector.value = cursoActivoId;
+            } else if (data.cursos.length > 0) {
+                // Si el curso activo ya no existe, pero hay otros cursos, no seleccionar ninguno
+                // Opcionalmente, seleccionar el primero: selector.value = data.cursos[0].id;
+                cursoActivoId = null; // Asegurarse que está nulo si no se encuentra
+            } else {
+                 cursoActivoId = null; // No hay cursos
+            }
+            
+            if (!cursoActivoId && valorActual && data.cursos.length > 0) {
+                // Si antes había un curso seleccionado y ya no (quizás fue borrado),
+                // y aún quedan cursos, dejar el selector en "Seleccione un curso"
+                // y llamar a seleccionarCursoActivo para actualizar el estado.
+                seleccionarCursoActivo();
+            } else if (cursoActivoId) {
+                 selector.value = cursoActivoId; // Restaurar si es válido
+            }
+        }
+
+        function seleccionarCursoActivo(idForzado = null) {
+            cursoActivoId = idForzado || document.getElementById('cursoActivoSelector').value || null;
+            
+            if (cursoActivoId) {
+                localStorage.setItem('gestorCursosActivoId', cursoActivoId);
+            } else {
+                localStorage.removeItem('gestorCursosActivoId');
+            }
+
+            actualizarVisibilidadNavCurso();
+            
+            if (!cursoActivoId) { 
+                 //showSection('cursos'); // No forzar siempre a cursos, puede ser que el usuario quiera deseleccionar
+                 ['Alumnos', 'Trabajos', 'Asistencia', 'Calificaciones', 'Temas', 'Informes'].forEach(sufijo => {
+                     const span = document.getElementById(`cursoSeleccionado${sufijo}`);
+                     if (span) span.textContent = "";
+                });
+                // Limpiar las listas de las secciones dependientes
+                ['listaAlumnos', 'listaTrabajos', 'formularioAsistenciaContainer', 'listaCalificacionesContainer', 'listaTemas'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = '';
+                });
+                document.getElementById('btnGuardarAsistencia').classList.add('hidden');
+                document.getElementById('selectorFiltroCalificaciones').classList.add('hidden');
+                // Si la sección activa no es 'cursos', ir a 'cursos'
+                 const seccionActivaElem = document.querySelector('.section.active');
+                 if (seccionActivaElem && seccionActivaElem.id !== 'cursos') {
+                    showSection('cursos');
+                 }
+                 return;
+            }
+            
+            actualizarNombresCursosSeleccionados();
+            const seccionActiva = document.querySelector('.section.active');
+            if (seccionActiva) {
+                showSection(seccionActiva.id); 
+            } else {
+                showSection('alumnos'); // O la primera sección relevante
+            }
+        }
+
+        // --- GESTIÓN DE ALUMNOS ---
+        function agregarAlumno() {
+            if (!cursoActivoId) { alert('Seleccione un curso primero.'); return; }
+            const nombreInput = document.getElementById('nombreAlumno');
+            const apellidoInput = document.getElementById('apellidoAlumno');
+            const nombre = nombreInput.value.trim();
+            const apellido = apellidoInput.value.trim();
+
+            if (nombre && apellido) {
+                data.alumnos.push({ id: generarId(), idCurso: cursoActivoId, nombre, apellido });
+                nombreInput.value = '';
+                apellidoInput.value = '';
+                guardarDatos();
+                renderAlumnos();
+            } else {
+                alert('Por favor, ingrese nombre y apellido del alumno.');
+            }
+        }
+
+        function renderAlumnos() {
+            const listaAlumnos = document.getElementById('listaAlumnos');
+            if (!cursoActivoId) { listaAlumnos.innerHTML = ''; return; }
+            
+            listaAlumnos.innerHTML = '';
+            const alumnosDelCurso = data.alumnos
+                .filter(a => a.idCurso === cursoActivoId)
+                .sort((a, b) => {
+                    const apellidoA = a.apellido.toLowerCase();
+                    const apellidoB = b.apellido.toLowerCase();
+                    if (apellidoA < apellidoB) return -1;
+                    if (apellidoA > apellidoB) return 1;
+                    const nombreA = a.nombre.toLowerCase();
+                    const nombreB = b.nombre.toLowerCase();
+                    if (nombreA < nombreB) return -1;
+                    if (nombreA > nombreB) return 1;
+                    return 0;
+                });
+
+            alumnosDelCurso.forEach(alumno => {
+                const li = document.createElement('li');
+                const nombreSpan = document.createElement('span');
+                nombreSpan.textContent = `${alumno.apellido}, ${alumno.nombre}`;
+                li.appendChild(nombreSpan);
+                
+                const divBotones = document.createElement('div');
+                const btnEditar = document.createElement('button');
+                btnEditar.textContent = 'Editar';
+                btnEditar.className = 'edit';
+                btnEditar.onclick = () => editarAlumno(alumno.id);
+
+                const btnBorrar = document.createElement('button');
+                btnBorrar.textContent = 'Borrar';
+                btnBorrar.className = 'delete';
+                btnBorrar.onclick = () => borrarAlumno(alumno.id);
+
+                divBotones.appendChild(btnEditar);
+                divBotones.appendChild(btnBorrar);
+                li.appendChild(divBotones);
+                listaAlumnos.appendChild(li);
+            });
+        }
+        
+        function editarAlumno(idAlumno) {
+            const alumno = data.alumnos.find(a => a.id === idAlumno);
+            if (!alumno) return;
+            const nuevoNombre = prompt("Nuevo nombre:", alumno.nombre);
+            if (nuevoNombre === null) return; // User cancelled
+
+            const nuevoApellido = prompt("Nuevo apellido:", alumno.apellido);
+            if (nuevoApellido === null) return; // User cancelled
+
+            if (nuevoNombre.trim() !== "" && nuevoApellido.trim() !== "") {
+                alumno.nombre = nuevoNombre.trim();
+                alumno.apellido = nuevoApellido.trim();
+                guardarDatos();
+                renderAlumnos();
+                if (document.getElementById('calificaciones').classList.contains('active')) { // Actualizar selectores si están visibles
+                    renderCalificacionesSelectores();
+                }
+            } else {
+                alert("Debe ingresar tanto nombre como apellido válidos.");
+            }
+        }
+
+        function borrarAlumno(idAlumno) {
+            if (confirm('¿Está seguro de que desea borrar este alumno? Se borrarán también sus asistencias y calificaciones.')) {
+                data.alumnos = data.alumnos.filter(a => a.id !== idAlumno);
+                data.asistencias = data.asistencias.filter(as => as.idAlumno !== idAlumno);
+                data.calificaciones = data.calificaciones.filter(cal => cal.idAlumno !== idAlumno);
+                guardarDatos();
+                renderAlumnos();
+                if (document.getElementById('calificaciones').classList.contains('active')) {
+                    renderCalificacionesSelectores();
+                    renderCalificaciones();
+                }
+                 if (document.getElementById('asistencia').classList.contains('active')) {
+                    cargarFormularioAsistencia(); // Recargar si la lista de asistencia estaba visible
+                }
+            }
+        }
+
+
+        // --- GESTIÓN DE TRABAJOS ---
+        function agregarTrabajo() {
+            if (!cursoActivoId) { alert('Seleccione un curso primero.'); return; }
+            const nombreInput = document.getElementById('nombreTrabajo');
+            const descripcionInput = document.getElementById('descripcionTrabajo');
+            const nombre = nombreInput.value.trim();
+            const descripcion = descripcionInput.value.trim();
+
+            if (nombre) {
+                data.trabajos.push({ id: generarId(), idCurso: cursoActivoId, nombre, descripcion });
+                nombreInput.value = '';
+                descripcionInput.value = '';
+                guardarDatos();
+                renderTrabajos();
+                 if (document.getElementById('calificaciones').classList.contains('active')) { // Actualizar selectores si están visibles
+                    renderCalificacionesSelectores();
+                }
+            } else {
+                alert('Por favor, ingrese un nombre para el trabajo.');
+            }
+        }
+
+        function renderTrabajos() {
+            const listaTrabajos = document.getElementById('listaTrabajos');
+            if (!cursoActivoId) { listaTrabajos.innerHTML = ''; return; }
+            
+            listaTrabajos.innerHTML = '';
+            const trabajosDelCurso = data.trabajos.filter(t => t.idCurso === cursoActivoId);
+
+            trabajosDelCurso.forEach(trabajo => {
+                const li = document.createElement('li');
+                
+                const contenidoSpan = document.createElement('span');
+                const strongNombre = document.createElement('strong');
+                strongNombre.textContent = trabajo.nombre;
+                contenidoSpan.appendChild(strongNombre);
+
+                if (trabajo.descripcion) {
+                    contenidoSpan.appendChild(document.createElement('br'));
+                    const smallDesc = document.createElement('small');
+                    smallDesc.textContent = trabajo.descripcion;
+                    contenidoSpan.appendChild(smallDesc);
+                }
+                li.appendChild(contenidoSpan);
+                
+                const divBotones = document.createElement('div');
+                const btnEditar = document.createElement('button');
+                btnEditar.textContent = 'Editar';
+                btnEditar.className = 'edit';
+                btnEditar.onclick = () => editarTrabajo(trabajo.id);
+
+                const btnBorrar = document.createElement('button');
+                btnBorrar.textContent = 'Borrar';
+                btnBorrar.className = 'delete';
+                btnBorrar.onclick = () => borrarTrabajo(trabajo.id);
+                
+                divBotones.appendChild(btnEditar);
+                divBotones.appendChild(btnBorrar);
+                li.appendChild(divBotones);
+                listaTrabajos.appendChild(li);
+            });
+        }
+
+        function editarTrabajo(idTrabajo) {
+            const trabajo = data.trabajos.find(t => t.id === idTrabajo);
+            if (!trabajo) return;
+            const nuevoNombre = prompt("Nuevo nombre del trabajo:", trabajo.nombre);
+            if (nuevoNombre === null) return; // User cancelled
+
+            const nuevaDescripcion = prompt("Nueva descripción:", trabajo.descripcion);
+            // No cancelamos si nuevaDescripcion es null, ya que una descripción vacía es válida.
+
+            if (nuevoNombre.trim() !== "") {
+                trabajo.nombre = nuevoNombre.trim();
+                trabajo.descripcion = (nuevaDescripcion === null) ? "" : nuevaDescripcion.trim();
+                guardarDatos();
+                renderTrabajos();
+                 if (document.getElementById('calificaciones').classList.contains('active')) { // Actualizar selectores si están visibles
+                    renderCalificacionesSelectores();
+                }
+            } else { 
+                alert("El nombre del trabajo no puede estar vacío.");
+            }
+        }
+        
+        function borrarTrabajo(idTrabajo) {
+             if (confirm('¿Está seguro de que desea borrar este trabajo? Se borrarán también todas las calificaciones asociadas.')) {
+                data.trabajos = data.trabajos.filter(t => t.id !== idTrabajo);
+                data.calificaciones = data.calificaciones.filter(cal => cal.idTrabajo !== idTrabajo);
+                guardarDatos();
+                renderTrabajos();
+                if (document.getElementById('calificaciones').classList.contains('active')) {
+                    renderCalificacionesSelectores();
+                    renderCalificaciones();
+                }
+            }
+        }
+
+        // --- GESTIÓN DE ASISTENCIA ---
+        function cargarFormularioAsistencia() {
+            if (!cursoActivoId) { alert('Seleccione un curso primero.'); return; }
+            const fecha = document.getElementById('fechaAsistencia').value;
+            if (!fecha) { alert('Seleccione una fecha.'); return; }
+
+            const container = document.getElementById('formularioAsistenciaContainer');
+            container.innerHTML = '';
+            const alumnosDelCurso = data.alumnos
+                .filter(a => a.idCurso === cursoActivoId)
+                .sort((a, b) => (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre));
+            
+            if (alumnosDelCurso.length === 0) {
+                container.innerHTML = "<p>No hay alumnos en este curso para tomar asistencia.</p>";
+                document.getElementById('btnGuardarAsistencia').classList.add('hidden');
+                return;
+            }
+
+            let alumnosParaAsistencia = alumnosDelCurso;
+            const asistenciasHoy = data.asistencias.filter(as => as.idCurso === cursoActivoId && as.fecha === fecha);
+            
+            if (asistenciasHoy.length > 0) {
+                const alumnosAusentesOSinRegistro = alumnosDelCurso.filter(alumno => {
+                    const asistenciaAlumno = asistenciasHoy.find(as => as.idAlumno === alumno.id);
+                    return !asistenciaAlumno || asistenciaAlumno.estado === 'ausente';
+                });
+                if (alumnosAusentesOSinRegistro.length > 0 && alumnosAusentesOSinRegistro.length < alumnosDelCurso.length) {
+                    if (confirm("Ya se tomó asistencia hoy. ¿Desea tomar asistencia solo a los alumnos marcados como ausentes o aquellos sin registro previo para esta fecha?")) {
+                        alumnosParaAsistencia = alumnosAusentesOSinRegistro;
+                    }
+                } else if (alumnosAusentesOSinRegistro.length === 0) {
+                    if (!confirm("Todos los alumnos ya tienen un estado de 'Presente' o 'Tarde' para esta fecha. ¿Desea volver a cargar la lista completa para modificar?")) {
+                        document.getElementById('btnGuardarAsistencia').classList.add('hidden');
+                        return; 
+                    }
+                }
+            }
+
+            const table = document.createElement('table');
+            const thead = table.createTHead();
+            const headerRow = thead.insertRow();
+            headerRow.innerHTML = '<th>Alumno</th><th>Estado</th>';
+            const tbody = table.createTBody();
+
+            alumnosParaAsistencia.forEach(alumno => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = `${alumno.apellido}, ${alumno.nombre}`;
+                const cellEstado = row.insertCell();
+                cellEstado.className = 'attendance-status';
+
+                const asistenciaExistente = data.asistencias.find(as => as.idCurso === cursoActivoId && as.idAlumno === alumno.id && as.fecha === fecha);
+                const estadoActual = asistenciaExistente ? asistenciaExistente.estado : 'presente'; 
+
+                ['presente', 'ausente', 'tarde'].forEach(estado => {
+                    const input = document.createElement('input');
+                    input.type = 'radio';
+                    input.name = `asistencia_${alumno.id}`;
+                    input.value = estado;
+                    input.id = `asistencia_${alumno.id}_${estado}`;
+                    if (estado === estadoActual) input.checked = true;
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `asistencia_${alumno.id}_${estado}`;
+                    label.textContent = estado.charAt(0).toUpperCase() + estado.slice(1);
+                    
+                    cellEstado.appendChild(input);
+                    cellEstado.appendChild(label);
+                });
+                row.dataset.alumnoId = alumno.id;
+            });
+            container.appendChild(table);
+            document.getElementById('btnGuardarAsistencia').classList.remove('hidden');
+        }
+
+        function guardarAsistencia() {
+            if (!cursoActivoId) { alert('Error: Curso no seleccionado.'); return; }
+            const fecha = document.getElementById('fechaAsistencia').value;
+            if (!fecha) { alert('Error: Fecha no seleccionada.'); return; }
+
+            const rows = document.querySelectorAll('#formularioAsistenciaContainer tr[data-alumno-id]');
+            if (rows.length === 0) {
+                alert("No hay alumnos en la lista para guardar asistencia.");
+                return;
+            }
+            let cambiosRealizados = false;
+            rows.forEach(row => {
+                const idAlumno = row.dataset.alumnoId;
+                const estadoSeleccionadoElement = row.querySelector(`input[name="asistencia_${idAlumno}"]:checked`);
+                if (!estadoSeleccionadoElement) {
+                    console.warn(`No se encontró estado seleccionado para alumno ${idAlumno}`);
+                    return; 
+                }
+                const estadoSeleccionado = estadoSeleccionadoElement.value;
+
+                let asistenciaExistente = data.asistencias.find(
+                    as => as.idCurso === cursoActivoId && as.idAlumno === idAlumno && as.fecha === fecha
+                );
+
+                if (asistenciaExistente) {
+                    if (asistenciaExistente.estado !== estadoSeleccionado) {
+                        asistenciaExistente.estado = estadoSeleccionado;
+                        cambiosRealizados = true;
+                    }
+                } else {
+                    data.asistencias.push({
+                        id: generarId(),
+                        idCurso: cursoActivoId,
+                        idAlumno: idAlumno,
+                        fecha: fecha,
+                        estado: estadoSeleccionado
+                    });
+                    cambiosRealizados = true;
+                }
+            });
+            if (cambiosRealizados) {
+                guardarDatos();
+                alert('Asistencia guardada/actualizada.');
+            } else {
+                alert('No se realizaron cambios en la asistencia.');
+            }
+        }
+        
+        // --- GESTIÓN DE CALIFICACIONES ---
+        function renderCalificacionesSelectores() {
+            if (!cursoActivoId) return;
+
+            const selectorAlumno = document.getElementById('alumnoCalificacionSelector');
+            selectorAlumno.innerHTML = '<option value="">-- Seleccione Alumno --</option>';
+            data.alumnos
+                .filter(a => a.idCurso === cursoActivoId)
+                .sort((a, b) => (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre))
+                .forEach(alumno => {
+                    const option = document.createElement('option');
+                    option.value = alumno.id;
+                    option.textContent = `${alumno.apellido}, ${alumno.nombre}`;
+                    selectorAlumno.appendChild(option);
+                });
+
+            const selectorTrabajo = document.getElementById('trabajoCalificacionSelector');
+            selectorTrabajo.innerHTML = '<option value="">-- Seleccione Trabajo --</option>';
+            data.trabajos
+                .filter(t => t.idCurso === cursoActivoId)
+                .sort((a,b) => a.nombre.localeCompare(b.nombre))
+                .forEach(trabajo => {
+                    const option = document.createElement('option');
+                    option.value = trabajo.id;
+                    option.textContent = trabajo.nombre;
+                    selectorTrabajo.appendChild(option);
+                });
+        }
+        
+        function guardarCalificacion() {
+            if (!cursoActivoId) { alert('Seleccione un curso primero.'); return; }
+            const idAlumno = document.getElementById('alumnoCalificacionSelector').value;
+            const idTrabajo = document.getElementById('trabajoCalificacionSelector').value;
+            const notaInput = document.getElementById('notaTrabajo');
+            const nota = notaInput.value !== "" ? parseFloat(notaInput.value) : null;
+            const comentarioInput = document.getElementById('comentarioTrabajo');
+            const comentario = comentarioInput.value.trim();
+
+            if (!idAlumno || !idTrabajo) {
+                alert('Debe seleccionar un alumno y un trabajo.');
+                return;
+            }
+            if (nota !== null && (isNaN(nota) || nota < 1 || nota > 10)) {
+                 alert('La nota debe ser un número entre 1 y 10, o dejarse vacía.');
+                 return;
+            }
+
+            let calificacionExistente = data.calificaciones.find(
+                c => c.idCurso === cursoActivoId && c.idAlumno === idAlumno && c.idTrabajo === idTrabajo
+            );
+
+            if (calificacionExistente) {
+                calificacionExistente.nota = nota;
+                calificacionExistente.comentario = comentario;
+                alert('Calificación actualizada.');
+            } else {
+                data.calificaciones.push({
+                    id: generarId(),
+                    idCurso: cursoActivoId,
+                    idAlumno,
+                    idTrabajo,
+                    nota,
+                    comentario
+                });
+                alert('Calificación guardada.');
+            }
+            
+            guardarDatos();
+            renderCalificaciones();
+            notaInput.value = '';
+            comentarioInput.value = '';
+        }
+
+        function renderCalificaciones() {
+            const container = document.getElementById('listaCalificacionesContainer');
+            const selectorFiltro = document.getElementById('selectorFiltroCalificaciones');
+
+            if (!cursoActivoId) { 
+                container.innerHTML = '';
+                selectorFiltro.classList.add('hidden');
+                return;
+            }
+
+            container.innerHTML = '';
+            const filtroVista = document.getElementById('filtroVistaCalificaciones').value;
+            const valorFiltroSeleccionado = selectorFiltro.value; 
+            
+            selectorFiltro.innerHTML = ''; 
+            selectorFiltro.classList.remove('hidden');
+
+            let itemsFiltrados = [];
+
+            if (filtroVista === 'alumno') {
+                selectorFiltro.innerHTML = '<option value="">-- Todos los Alumnos --</option>';
+                data.alumnos
+                    .filter(a => a.idCurso === cursoActivoId)
+                    .sort((a, b) => (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre))
+                    .forEach(a => {
+                        const option = document.createElement('option');
+                        option.value = a.id;
+                        option.textContent = getNombreAlumnoCompleto(a.id);
+                        selectorFiltro.appendChild(option);
+                    });
+                
+                if (valorFiltroSeleccionado) selectorFiltro.value = valorFiltroSeleccionado; 
+                const idAlumnoSeleccionado = selectorFiltro.value;
+                itemsFiltrados = data.calificaciones.filter(c => 
+                    c.idCurso === cursoActivoId && 
+                    (idAlumnoSeleccionado ? c.idAlumno === idAlumnoSeleccionado : true)
+                );
+
+            } else { // filtroVista === 'trabajo'
+                selectorFiltro.innerHTML = '<option value="">-- Todos los Trabajos --</option>';
+                data.trabajos
+                    .filter(t => t.idCurso === cursoActivoId)
+                    .sort((a,b) => a.nombre.localeCompare(b.nombre))
+                    .forEach(t => {
+                        const option = document.createElement('option');
+                        option.value = t.id;
+                        option.textContent = getNombreTrabajo(t.id);
+                        selectorFiltro.appendChild(option);
+                    });
+                
+                if (valorFiltroSeleccionado) selectorFiltro.value = valorFiltroSeleccionado; 
+                const idTrabajoSeleccionado = selectorFiltro.value;
+                itemsFiltrados = data.calificaciones.filter(c => 
+                    c.idCurso === cursoActivoId &&
+                    (idTrabajoSeleccionado ? c.idTrabajo === idTrabajoSeleccionado : true)
+                );
+            }
+            
+            if (itemsFiltrados.length === 0) {
+                container.innerHTML = "<p>No hay calificaciones para mostrar con los filtros actuales.</p>";
+                return;
+            }
+
+            const table = document.createElement('table');
+            const thead = table.createTHead();
+            const headerRow = thead.insertRow();
+            headerRow.innerHTML = '<th>Alumno</th><th>Trabajo</th><th>Nota</th><th>Comentario</th><th>Acciones</th>';
+            const tbody = table.createTBody();
+
+            itemsFiltrados.sort((a,b) => { // Ordenar por alumno y luego por trabajo
+                const nombreAlumnoA = getNombreAlumnoCompleto(a.idAlumno);
+                const nombreAlumnoB = getNombreAlumnoCompleto(b.idAlumno);
+                if (nombreAlumnoA.localeCompare(nombreAlumnoB) !== 0) {
+                    return nombreAlumnoA.localeCompare(nombreAlumnoB);
+                }
+                return getNombreTrabajo(a.idTrabajo).localeCompare(getNombreTrabajo(b.idTrabajo));
+            }).forEach(cal => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = getNombreAlumnoCompleto(cal.idAlumno);
+                row.insertCell().textContent = getNombreTrabajo(cal.idTrabajo);
+                row.insertCell().textContent = cal.nota !== null ? cal.nota : 'S/N';
+                row.insertCell().textContent = cal.comentario || '-';
+                
+                const cellAcciones = row.insertCell();
+                const btnEditar = document.createElement('button');
+                btnEditar.textContent = 'Editar';
+                btnEditar.className = 'edit';
+                btnEditar.onclick = () => editarCalificacion(cal.id);
+                
+                const btnBorrar = document.createElement('button');
+                btnBorrar.textContent = 'Borrar';
+                btnBorrar.className = 'delete';
+                btnBorrar.onclick = () => borrarCalificacion(cal.id);
+                
+                cellAcciones.appendChild(btnEditar);
+                cellAcciones.appendChild(btnBorrar);
+            });
+            container.appendChild(table);
+        }
+
+        function editarCalificacion(idCalificacion) {
+            const cal = data.calificaciones.find(c => c.id === idCalificacion);
+            if (!cal) return;
+
+            document.getElementById('alumnoCalificacionSelector').value = cal.idAlumno;
+            document.getElementById('trabajoCalificacionSelector').value = cal.idTrabajo;
+            document.getElementById('notaTrabajo').value = cal.nota !== null ? cal.nota : '';
+            document.getElementById('comentarioTrabajo').value = cal.comentario;
+            
+            alert("Datos cargados en el formulario para edición. Modifique y presione 'Guardar Calificación' para actualizar.");
+            document.getElementById('notaTrabajo').focus();
+        }
+
+        function borrarCalificacion(idCalificacion) {
+            if (confirm('¿Está seguro de que desea borrar esta calificación?')) {
+                data.calificaciones = data.calificaciones.filter(c => c.id !== idCalificacion);
+                guardarDatos();
+                renderCalificaciones();
+            }
+        }
+
+
+        // --- GESTIÓN DE TEMAS Y ENLACES ---
+        function agregarTema() {
+            if (!cursoActivoId) { alert('Seleccione un curso primero.'); return; }
+            const tituloInput = document.getElementById('tituloTema');
+            const enlaceInput = document.getElementById('enlaceTema');
+            const titulo = tituloInput.value.trim();
+            const enlace = enlaceInput.value.trim();
+
+            if (titulo && enlace) {
+                try {
+                    new URL(enlace); 
+                     data.temas.push({ id: generarId(), idCurso: cursoActivoId, titulo, enlace });
+                    tituloInput.value = '';
+                    enlaceInput.value = '';
+                    guardarDatos();
+                    renderTemas();
+                } catch (_) {
+                    alert('El enlace no parece ser una URL válida. Asegúrese de que incluya http:// o https://');
+                }
+            } else {
+                alert('Por favor, ingrese título y enlace.');
+            }
+        }
+
+        function renderTemas() {
+            const listaTemas = document.getElementById('listaTemas');
+            if (!cursoActivoId) { listaTemas.innerHTML = ''; return; }
+            
+            listaTemas.innerHTML = '';
+            const temasDelCurso = data.temas.filter(t => t.idCurso === cursoActivoId);
+
+            temasDelCurso.forEach(tema => {
+                const li = document.createElement('li');
+                
+                const contenido = document.createElement('span');
+                const strongTitulo = document.createElement('strong');
+                strongTitulo.textContent = tema.titulo + ": ";
+                contenido.appendChild(strongTitulo);
+
+                const anchorEnlace = document.createElement('a');
+                anchorEnlace.href = tema.enlace;
+                anchorEnlace.target = "_blank";
+                anchorEnlace.rel = "noopener noreferrer";
+                anchorEnlace.textContent = tema.enlace;
+                contenido.appendChild(anchorEnlace);
+                
+                li.appendChild(contenido);
+
+                const divBotones = document.createElement('div');
+                const btnEditar = document.createElement('button');
+                btnEditar.textContent = 'Editar';
+                btnEditar.className = 'edit';
+                btnEditar.onclick = () => editarTema(tema.id);
+
+                const btnBorrar = document.createElement('button');
+                btnBorrar.textContent = 'Borrar';
+                btnBorrar.className = 'delete';
+                btnBorrar.onclick = () => borrarTema(tema.id);
+
+                divBotones.appendChild(btnEditar);
+                divBotones.appendChild(btnBorrar);
+                li.appendChild(divBotones);
+                listaTemas.appendChild(li);
+            });
+        }
+        
+        function editarTema(idTema) {
+            const tema = data.temas.find(t => t.id === idTema);
+            if (!tema) return;
+            const nuevoTitulo = prompt("Nuevo título:", tema.titulo);
+            if (nuevoTitulo === null) return; // User cancelled
+
+            const nuevoEnlace = prompt("Nuevo enlace:", tema.enlace);
+            if (nuevoEnlace === null) return; // User cancelled
+
+            if (nuevoTitulo.trim() !== "" && nuevoEnlace.trim() !== "") {
+                 try {
+                    new URL(nuevoEnlace.trim());
+                    tema.titulo = nuevoTitulo.trim();
+                    tema.enlace = nuevoEnlace.trim();
+                    guardarDatos();
+                    renderTemas();
+                } catch (_) {
+                    alert('El enlace no parece ser una URL válida.');
+                }
+            } else {
+                alert("Ni el título ni el enlace pueden estar vacíos.");
+            }
+        }
+
+        function borrarTema(idTema) {
+             if (confirm('¿Está seguro de que desea borrar este tema/enlace?')) {
+                data.temas = data.temas.filter(t => t.id !== idTema);
+                guardarDatos();
+                renderTemas();
+            }
+        }
+
+        // --- GENERACIÓN DE INFORMES ---
+        function descargarArchivo(filename, content, contentType) {
+            const bom = (contentType === 'text/csv;charset=utf-8;') ? "\uFEFF" : ""; // BOM solo para CSV
+            const blob = new Blob([bom + content], { type: contentType });
+            const link = document.createElement("a");
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                alert("La descarga directa de archivos no es soportada por su navegador.");
+            }
+        }
+
+        function generarInformeAsistencia() {
+            if (!cursoActivoId) { alert('Seleccione un curso para generar el informe.'); return; }
+            
+            const alumnosCurso = data.alumnos.filter(a => a.idCurso === cursoActivoId)
+                                    .sort((a,b) => (a.apellido+a.nombre).localeCompare(b.apellido+b.nombre));
+            if (alumnosCurso.length === 0) {
+                alert("No hay alumnos en este curso.");
+                return;
+            }
+
+            const fechasUnicas = [...new Set(data.asistencias
+                                .filter(as => as.idCurso === cursoActivoId)
+                                .map(as => as.fecha))]
+                                .sort((a,b) => new Date(a) - new Date(b)); 
+
+            if (fechasUnicas.length === 0) {
+                alert("No hay registros de asistencia para este curso.");
+                return;
+            }
+
+            let csvContent = "Alumno," + fechasUnicas.join(',') + ",% Presente (P+T)\n";
+            
+            let totalPresentesTardesCurso = 0;
+            let totalRegistrosAsistenciaCurso = 0;
+
+            alumnosCurso.forEach(alumno => {
+                let row = `"${getNombreAlumnoCompleto(alumno.id)}",`;
+                let totalPresenteTardeAlumno = 0;
+                let totalClasesRegistradasParaAlumno = 0;
+
+                fechasUnicas.forEach(fecha => {
+                    const asistencia = data.asistencias.find(as => 
+                        as.idCurso === cursoActivoId && 
+                        as.idAlumno === alumno.id && 
+                        as.fecha === fecha
+                    );
+                    if (asistencia) {
+                        row += (asistencia.estado.charAt(0).toUpperCase()) + ","; 
+                        if (asistencia.estado === 'presente' || asistencia.estado === 'tarde') { 
+                            totalPresenteTardeAlumno++;
+                            totalPresentesTardesCurso++;
+                        }
+                        totalClasesRegistradasParaAlumno++;
+                        totalRegistrosAsistenciaCurso++;
+                    } else {
+                        row += "S/R,"; 
+                    }
+                });
+                const porcentajePresente = totalClasesRegistradasParaAlumno > 0 ? ((totalPresenteTardeAlumno / totalClasesRegistradasParaAlumno) * 100).toFixed(2) : "0.00";
+                row += `${porcentajePresente}%\n`;
+                csvContent += row;
+            });
+            
+            const porcentajeTotalCurso = totalRegistrosAsistenciaCurso > 0 ? ((totalPresentesTardesCurso / totalRegistrosAsistenciaCurso) * 100).toFixed(2) : "0.00";
+            csvContent += `\n"Porcentaje total de asistencia (Presentes+Tardes) del curso sobre clases con registro:",${porcentajeTotalCurso}%`;
+            
+            const nombreCurso = getNombreCurso(cursoActivoId).replace(/[^\w\s.-]/gi, '').replace(/\s+/g, '_');
+            const fechaHoy = new Date().toISOString().split('T')[0];
+            descargarArchivo(`Informe_Asistencia_${nombreCurso}_${fechaHoy}.csv`, csvContent, 'text/csv;charset=utf-8;');
+        }
+
+        function generarInformeCalificaciones() {
+            if (!cursoActivoId) { alert('Seleccione un curso para generar el informe.'); return; }
+            const alumnosCurso = data.alumnos.filter(a => a.idCurso === cursoActivoId)
+                                    .sort((a,b) => (a.apellido+a.nombre).localeCompare(b.apellido+b.nombre));
+            
+            if (alumnosCurso.length === 0) {
+                alert("No hay alumnos en este curso.");
+                return;
+            }
+
+            const trabajosCurso = data.trabajos.filter(t => t.idCurso === cursoActivoId)
+                                   .sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+            let csvHeader = "\"Alumno\"";
+            trabajosCurso.forEach(t => {
+                const nombreTrabajoEscapado = `"${t.nombre.replace(/"/g, '""')}"`;
+                csvHeader += `,${nombreTrabajoEscapado} (Nota),${nombreTrabajoEscapado} (Comentario)`;
+            });
+            csvHeader += ",\"Promedio General\",\"Estado Final\"\n";
+            let csvContent = csvHeader;
+
+            const fechasConAsistenciaCurso = [...new Set(data.asistencias.filter(as => as.idCurso === cursoActivoId).map(as => as.fecha))];
+
+            alumnosCurso.forEach(alumno => {
+                let row = `"${getNombreAlumnoCompleto(alumno.id).replace(/"/g, '""')}"`;
+                let notasAlumno = [];
+                
+                let siempreAusente = false;
+                if (fechasConAsistenciaCurso.length > 0) { 
+                    const asistenciasAlumno = data.asistencias.filter(as => as.idAlumno === alumno.id && as.idCurso === cursoActivoId);
+                    if (asistenciasAlumno.length === 0 && fechasConAsistenciaCurso.length > 0) { // No tiene registros de asistencia, pero el curso SÍ tiene fechas de asistencia tomadas
+                        siempreAusente = true;
+                    } else if (asistenciasAlumno.length > 0) { 
+                        siempreAusente = asistenciasAlumno.every(as => as.estado === 'ausente');
+                    }
+                }
+
+
+                trabajosCurso.forEach(trabajo => {
+                    const calificacion = data.calificaciones.find(c => 
+                        c.idAlumno === alumno.id && 
+                        c.idTrabajo === trabajo.id && 
+                        c.idCurso === cursoActivoId
+                    );
+                    if (calificacion && calificacion.nota !== null) {
+                        row += `,"${calificacion.nota}","${(calificacion.comentario || "").replace(/"/g, '""')}"`;
+                        notasAlumno.push(calificacion.nota);
+                    } else if (calificacion) { 
+                         row += `,"S/N","${(calificacion.comentario || "").replace(/"/g, '""')}"`;
+                    }
+                    else {
+                        row += `,"-","-"`; 
+                    }
+                });
+
+                let promedio = 0;
+                let estadoFinal = "";
+
+                if (notasAlumno.length > 0) {
+                    promedio = notasAlumno.reduce((sum, nota) => sum + nota, 0) / notasAlumno.length;
+                    row += `,"${promedio.toFixed(2)}"`;
+                    if (promedio >= 7) {
+                        estadoFinal = "TEA"; // Trayectoria Educativa Avanzada
+                    } else if (promedio >= 4) {
+                        estadoFinal = "TEP"; // Trayectoria Educativa en Proceso
+                    } else {
+                        estadoFinal = "TED"; // Trayectoria Educativa Discontinua (ejemplo, ajustar según criterio)
+                    }
+                } else {
+                    row += `,"N/A"`; 
+                    if (siempreAusente) { 
+                         estadoFinal = "TEP"; // O "TED" según criterio para ausentes sin notas
+                    } else {
+                        estadoFinal = "Sin definir"; 
+                    }
+                }
+                row += `,"${estadoFinal}"\n`;
+                csvContent += row;
+            });
+            
+            const nombreCurso = getNombreCurso(cursoActivoId).replace(/[^\w\s.-]/gi, '').replace(/\s+/g, '_');
+            const fechaHoy = new Date().toISOString().split('T')[0];
+            descargarArchivo(`Informe_Calificaciones_${nombreCurso}_${fechaHoy}.csv`, csvContent, 'text/csv;charset=utf-8;');
+        }
+
+
+        // --- BACKUP Y RESTAURACIÓN ---
+        function exportarDatos() {
+            const jsonData = JSON.stringify(data, null, 2); // null, 2 para pretty print
+            const fechaHoy = new Date().toISOString().split('T')[0];
+            descargarArchivo(`gestor_cursos_backup_${fechaHoy}.json`, jsonData, 'application/json;charset=utf-8;');
+            alert("Datos exportados. Guarde el archivo JSON en un lugar seguro.");
+        }
+
+        function importarDatos(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!confirm("¿Está seguro de que desea importar datos? Esto sobrescribirá todos los datos actuales.")) {
+                event.target.value = null; // Reset file input
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    // Validación básica de la estructura importada
+                    if (importedData && typeof importedData === 'object' &&
+                        Array.isArray(importedData.cursos) &&
+                        Array.isArray(importedData.alumnos) &&
+                        Array.isArray(importedData.trabajos) &&
+                        Array.isArray(importedData.asistencias) &&
+                        Array.isArray(importedData.calificaciones) &&
+                        Array.isArray(importedData.temas)
+                    ) {
+                        data = importedData;
+                        cursoActivoId = null; // Resetear curso activo
+                        localStorage.removeItem('gestorCursosActivoId');
+                        guardarDatos(); // Guardar los nuevos datos importados
+                        alert('Datos importados correctamente. La aplicación se recargará.');
+                        init(); // Reinicializar la aplicación para reflejar los nuevos datos
+                    } else {
+                        alert('El archivo JSON importado no tiene el formato esperado.');
+                    }
+                } catch (error) {
+                    console.error("Error al importar datos:", error);
+                    alert('Error al procesar el archivo JSON. Asegúrese de que sea un backup válido.');
+                } finally {
+                    event.target.value = null; // Reset file input para permitir re-seleccionar el mismo archivo
+                }
+            };
+            reader.readAsText(file);
+        }
+
+
+        // --- INICIALIZACIÓN ---
+        function init() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fechaAsistencia').value = today;
+
+            cargarDatos(); 
+            renderCursos();
+            renderSelectorCursos(); 
+            
+            actualizarVisibilidadNavCurso(); 
+            
+            if (cursoActivoId) {
+                // renderSelectorCursos ya setea el valor.
+                // seleccionarCursoActivo() se llamará implícitamente si es necesario o al cambiar el selector
+                // Forzar una actualización de la sección activa si hay un curso activo
+                const seccionActivaElem = document.querySelector('.section.active');
+                if (seccionActivaElem) {
+                    showSection(seccionActivaElem.id);
+                } else if (data.cursos.length > 0) { // Si no hay sección activa pero hay cursos, ir a una por defecto
+                    showSection('alumnos'); // O la primera sección relevante post-cursos
+                } else {
+                    showSection('cursos');
+                }
+            } else {
+                showSection('cursos'); 
+            }
+        }
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>
